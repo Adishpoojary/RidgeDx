@@ -1,5 +1,5 @@
-# RidgeDx — Deployment Dependencies (CPU-only for Render)
-# Install: pip install -r requirements.txt
+# RidgeDx — Deployment Dependencies (ONNX Runtime — lightweight)
+# No PyTorch needed! ONNX Runtime is 6x smaller.
 
 # Core Framework
 flask>=3.0
@@ -7,19 +7,12 @@ flask-cors>=4.0
 flask-restx>=1.3
 werkzeug>=3.0
 
-# Deep Learning (CPU-only — keeps image small)
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
+# ONNX Runtime (replaces PyTorch for deployment — ~50MB vs ~300MB)
+onnxruntime>=1.17
 
 # Data Science
-scikit-learn>=1.3
 numpy>=1.24
 Pillow>=10.0
-matplotlib>=3.7
 
 # Production Server
 gunicorn>=21.0
-
-# Configuration
-python-dotenv>=1.0
