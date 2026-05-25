@@ -1,4 +1,4 @@
-# RidgeDx — Deployment Dependencies (CPU-only for Render/Heroku)
+# RidgeDx — Deployment Dependencies (CPU-only for Render)
 # Install: pip install -r requirements.txt
 
 # Core Framework
@@ -11,9 +11,6 @@ werkzeug>=3.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision
-
-# Grad-CAM Explainability
-pytorch-grad-cam>=1.5
 
 # Data Science
 scikit-learn>=1.3
