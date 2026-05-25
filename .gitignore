@@ -1,0 +1,58 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ===== Virtual Environments =====
+venv/
+Code/venv/
+.venv/
+env/
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== Dataset (LARGE — do NOT push) =====
+dataset_blood_group/
+Code/dataset_blood_group/
+
+# ===== Database (generated at runtime) =====
+*.db
+
+# ===== Uploads (user data) =====
+Code/static/uploads/*
+!Code/static/uploads/.gitkeep
+
+# ===== Old/Legacy files =====
+Code/new_model_testing.pkl
+Code/.ipynb_checkpoints/
+Code/testing/
+Code/Test Images/
+git-filter-repo.py
+
+# ===== Environment secrets =====
+.env
+
+# ===== Training artifacts (optional) =====
+Code/training_plots.png
+
+# ===== OS =====
+*.dll
+*.lib
+*.so
+*.dylib
+
+# ===== Report/Research (optional — remove if you want them in repo) =====
+# Report & PPT/
+# Research Paper/
+# Results/

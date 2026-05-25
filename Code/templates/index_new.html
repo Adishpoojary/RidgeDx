@@ -1,0 +1,2816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RidgeDx — AI Blood Group Prediction from Fingerprints</title>
+  <meta name="description" content="RidgeDx uses deep learning and Grad-CAM explainability to predict blood group from fingerprint images in under 50ms. 8-class ABO+Rh classification powered by ResNet-18.">
+  <meta name="keywords" content="blood group prediction, fingerprint analysis, deep learning, biometric AI, Grad-CAM, RidgeDx">
+  <meta name="author" content="Adish">
+  <meta name="theme-color" content="#0a0e1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       DESIGN SYSTEM — CSS Variables
+       ============================================================ */
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #0d1526;
+      --surface: #111827;
+      --surface-hover: #1a2332;
+      --accent: #38bdf8;
+      --accent-secondary: #0ea5e9;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --accent-glow-strong: rgba(56, 189, 248, 0.3);
+      --text-primary: #f0f9ff;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border: rgba(56, 189, 248, 0.12);
+      --border-hover: rgba(56, 189, 248, 0.3);
+      --danger: #f43f5e;
+      --danger-glow: rgba(244, 63, 94, 0.2);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --radius-card: 12px;
+      --radius-input: 8px;
+      --radius-badge: 6px;
+      --radius-full: 9999px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+      --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.15);
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --nav-height: 64px;
+    }
+
+    /* ============================================================
+       RESET & BASE
+       ============================================================ */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+
+    a:hover {
+      color: var(--accent-secondary);
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    button {
+      font-family: var(--font);
+      cursor: pointer;
+      border: none;
+      outline: none;
+    }
+
+    input {
+      font-family: var(--font);
+      outline: none;
+    }
+
+    ::selection {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+
+    /* ============================================================
+       UTILITY CLASSES
+       ============================================================ */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .section {
+      padding: 100px 0;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: var(--accent-glow);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+
+    .section-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      line-height: 1.7;
+    }
+
+    .text-accent {
+      color: var(--accent);
+    }
+
+    .text-danger {
+      color: var(--danger);
+    }
+
+    .fade-in {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ============================================================
+       NAVBAR
+       ============================================================ */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-height);
+      background: rgba(10, 14, 26, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+    }
+
+    .navbar .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .nav-logo svg {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .nav-logo-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-radius: var(--radius-badge);
+      transition: all var(--transition);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--text-primary);
+      background: var(--accent-glow);
+    }
+
+    .nav-links a.active {
+      color: var(--accent);
+    }
+
+    .nav-cta {
+      padding: 8px 20px !important;
+      background: var(--accent) !important;
+      color: var(--bg-primary) !important;
+      font-weight: 600 !important;
+      border-radius: var(--radius-input) !important;
+    }
+
+    .nav-cta:hover {
+      background: var(--accent-secondary) !important;
+      transform: translateY(-1px);
+    }
+
+    /* Hamburger */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 4px;
+      z-index: 1001;
+    }
+
+    .hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+
+    .hamburger.open span:nth-child(1) {
+      transform: rotate(45deg) translate(5px, 5px);
+    }
+
+    .hamburger.open span:nth-child(2) {
+      opacity: 0;
+    }
+
+    .hamburger.open span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -5px);
+    }
+
+    /* Mobile nav */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      top: var(--nav-height);
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 14, 26, 0.98);
+      backdrop-filter: blur(20px);
+      z-index: 999;
+      padding: 32px 24px;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mobile-nav.open {
+      display: flex;
+    }
+
+    .mobile-nav a {
+      display: block;
+      padding: 14px 20px;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-radius: var(--radius-input);
+      transition: all var(--transition);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .mobile-nav a:hover,
+    .mobile-nav a.active {
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+      .hamburger {
+        display: flex;
+      }
+    }
+
+    /* ============================================================
+       PAGE CONTAINER — used for routing
+       ============================================================ */
+    .page {
+      display: none;
+      min-height: 100vh;
+      padding-top: var(--nav-height);
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* ============================================================
+       LANDING PAGE — Hero
+       ============================================================ */
+    .hero {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - var(--nav-height));
+      text-align: center;
+      overflow: hidden;
+      padding: 80px 0;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 50%, rgba(14, 165, 233, 0.05) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 700px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: var(--accent-glow);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 28px;
+    }
+
+    .hero-badge .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .hero h1 .gradient-text {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary), var(--danger));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      max-width: 520px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* Fingerprint scan animation */
+    .fingerprint-visual {
+      position: relative;
+      width: 200px;
+      height: 240px;
+      margin: 50px auto 0;
+    }
+
+    .fingerprint-icon {
+      width: 200px;
+      height: 240px;
+      opacity: 0.2;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+      box-shadow: 0 0 15px var(--accent), 0 0 30px rgba(56, 189, 248, 0.3);
+      animation: scan-sweep 3s ease-in-out infinite;
+      border-radius: 2px;
+    }
+
+    @keyframes scan-sweep {
+      0% { top: 0; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: calc(100% - 3px); opacity: 0; }
+    }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 28px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border-radius: var(--radius-input);
+      transition: all var(--transition);
+      text-decoration: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-secondary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3);
+      color: var(--bg-primary);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      transform: translateY(-2px);
+      color: var(--text-primary);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #e11d48;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(244, 63, 94, 0.3);
+    }
+
+    /* Shimmer effect */
+    .btn-shimmer::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+      animation: shimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 200%; }
+    }
+
+    /* ============================================================
+       FEATURE CARDS
+       ============================================================ */
+    .features {
+      background: var(--bg-secondary);
+      padding: 100px 0;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-glow);
+      border-radius: var(--radius-input);
+      margin-bottom: 20px;
+      font-size: 1.25rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+    }
+
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border-radius: var(--radius-badge);
+      border: 1px solid var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ============================================================
+       HOW IT WORKS
+       ============================================================ */
+    .how-it-works {
+      padding: 100px 0;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      margin-top: 48px;
+    }
+
+    .step-card {
+      text-align: center;
+      position: relative;
+    }
+
+    .step-number {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      color: var(--bg-primary);
+      font-size: 1.25rem;
+      font-weight: 700;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .step-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .step-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Connector line between steps */
+    .step-card:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 28px;
+      right: -16px;
+      width: 32px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      display: none;
+    }
+
+    @media (min-width: 769px) {
+      .step-card:not(:last-child)::after {
+        display: block;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .steps-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+
+    /* ============================================================
+       STATS BAR (Landing)
+       ============================================================ */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-top: 80px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 640px) {
+      .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* ============================================================
+       AUTH PAGES (Login / Signup)
+       ============================================================ */
+    .auth-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - var(--nav-height));
+      padding: 40px 24px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-secondary), var(--danger));
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .auth-header h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .auth-header p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-input);
+      color: var(--text-primary);
+      font-size: 0.9375rem;
+      transition: all var(--transition);
+    }
+
+    .input-wrapper input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .input-wrapper input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .input-wrapper .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .input-wrapper .toggle-password:hover {
+      color: var(--accent);
+    }
+
+    .input-wrapper input[type="password"] {
+      padding-right: 44px;
+    }
+
+    .form-submit {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: var(--bg-primary);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-input);
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-top: 8px;
+    }
+
+    .form-submit:hover {
+      background: var(--accent-secondary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3);
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 24px 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .google-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-input);
+      color: var(--text-primary);
+      font-size: 0.9375rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .google-btn:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+    }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .auth-footer a {
+      color: var(--accent);
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    /* Password strength meter */
+    .strength-meter {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .strength-meter .bar {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      transition: background 0.3s ease;
+    }
+
+    .strength-meter.weak .bar:nth-child(1) { background: var(--danger); }
+    .strength-meter.medium .bar:nth-child(1),
+    .strength-meter.medium .bar:nth-child(2) { background: var(--warning); }
+    .strength-meter.strong .bar:nth-child(1),
+    .strength-meter.strong .bar:nth-child(2),
+    .strength-meter.strong .bar:nth-child(3) { background: var(--success); }
+    .strength-meter.very-strong .bar { background: var(--success); }
+
+    .strength-label {
+      font-size: 0.75rem;
+      margin-top: 4px;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
+       PREDICT PAGE
+       ============================================================ */
+    .predict-page {
+      padding: 40px 0;
+    }
+
+    .predict-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      min-height: calc(100vh - var(--nav-height) - 120px);
+      align-items: start;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-card);
+      padding: 60px 40px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .upload-zone.has-file {
+      border-style: solid;
+      border-color: var(--accent);
+    }
+
+    .upload-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      opacity: 0.5;
+    }
+
+    .upload-zone h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .upload-zone p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .upload-zone .file-types {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .upload-input {
+      display: none;
+    }
+
+    /* Preview panel */
+    .preview-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .preview-panel h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: var(--text-secondary);
+      align-self: flex-start;
+    }
+
+    .preview-image-container {
+      width: 100%;
+      max-width: 300px;
+      aspect-ratio: 1;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .preview-image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-placeholder {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .analyze-btn {
+      width: 100%;
+      padding: 14px 28px;
+      font-size: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Scanning overlay */
+    .scanning-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 14, 26, 0.9);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      border-radius: var(--radius-card);
+      z-index: 5;
+    }
+
+    .scanning-overlay.active {
+      display: flex;
+    }
+
+    .scanning-fingerprint {
+      width: 80px;
+      height: 80px;
+      animation: pulse-scan 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-scan {
+      0%, 100% { opacity: 0.4; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+
+    .scanning-text {
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .scanning-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
+
+    @media (max-width: 768px) {
+      .predict-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ============================================================
+       RESULT PAGE
+       ============================================================ */
+    .result-page {
+      padding: 40px 0;
+    }
+
+    .result-layout {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .result-hero {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    /* Glowing blood group badge */
+    .blood-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--danger), #be123c);
+      color: white;
+      font-size: 3.5rem;
+      font-weight: 700;
+      margin: 0 auto 24px;
+      box-shadow: 0 0 40px var(--danger-glow), 0 0 80px rgba(244, 63, 94, 0.1);
+      animation: glow-pulse 3s ease-in-out infinite;
+      position: relative;
+    }
+
+    .blood-badge::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid rgba(244, 63, 94, 0.3);
+      animation: ring-pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes glow-pulse {
+      0%, 100% { box-shadow: 0 0 40px var(--danger-glow), 0 0 80px rgba(244, 63, 94, 0.1); }
+      50% { box-shadow: 0 0 60px rgba(244, 63, 94, 0.4), 0 0 100px rgba(244, 63, 94, 0.15); }
+    }
+
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.5; }
+    }
+
+    .result-hero h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .result-hero .inference-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--success);
+      border-radius: var(--radius-full);
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+
+    /* Confidence ring */
+    .confidence-section {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+      align-items: center;
+    }
+
+    .radial-progress {
+      width: 180px;
+      height: 180px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .radial-progress svg {
+      transform: rotate(-90deg);
+      width: 180px;
+      height: 180px;
+    }
+
+    .radial-progress .bg-ring {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 8;
+    }
+
+    .radial-progress .progress-ring {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.5s ease-out;
+    }
+
+    .radial-progress .center-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radial-progress .percentage {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .radial-progress .conf-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    /* Probability bars */
+    .prob-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .prob-label {
+      width: 40px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: right;
+      color: var(--text-secondary);
+    }
+
+    .prob-label.highlight {
+      color: var(--danger);
+    }
+
+    .prob-track {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .prob-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--accent);
+      transition: width 1s ease-out;
+    }
+
+    .prob-fill.top {
+      background: linear-gradient(90deg, var(--danger), #fb7185);
+    }
+
+    .prob-value {
+      width: 48px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    /* Grad-CAM section */
+    .gradcam-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      margin-top: 32px;
+    }
+
+    .gradcam-section h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .gradcam-section .description {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .gradcam-placeholder {
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-input);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
+    .gradcam-placeholder-text {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 20px;
+    }
+
+    @media (max-width: 640px) {
+      .confidence-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ============================================================
+       DASHBOARD PAGE
+       ============================================================ */
+    .dashboard-page {
+      padding: 40px 0;
+    }
+
+    .dashboard-header {
+      margin-bottom: 32px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .dashboard-header p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .stat-card-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .stat-card-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .stat-card-change {
+      font-size: 0.8rem;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Scan history table */
+    .history-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-header h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 12px 24px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .history-table td {
+      padding: 14px 24px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .history-table tr:hover td {
+      background: var(--surface-hover);
+    }
+
+    .table-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: var(--radius-badge);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .table-badge.blood {
+      background: var(--danger-glow);
+      color: var(--danger);
+    }
+
+    .table-badge.confidence {
+      background: var(--accent-glow);
+      color: var(--accent);
+    }
+
+    @media (max-width: 768px) {
+      .stats-cards {
+        grid-template-columns: 1fr;
+      }
+      .history-table {
+        font-size: 0.8rem;
+      }
+      .history-table th,
+      .history-table td {
+        padding: 10px 16px;
+      }
+    }
+
+    /* ============================================================
+       TOAST NOTIFICATIONS
+       ============================================================ */
+    .toast-container {
+      position: fixed;
+      top: calc(var(--nav-height) + 16px);
+      right: 16px;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-input);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      box-shadow: var(--shadow-lg);
+      animation: slide-in 0.3s ease-out;
+      max-width: 360px;
+    }
+
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .toast.error {
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .footer a {
+      color: var(--accent);
+    }
+
+    /* ============================================================
+       RESPONSIVE — hero
+       ============================================================ */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2.25rem;
+      }
+      .hero-subtitle {
+        font-size: 1rem;
+      }
+      .section-title {
+        font-size: 1.75rem;
+      }
+      .fingerprint-visual {
+        width: 140px;
+        height: 168px;
+      }
+      .fingerprint-icon {
+        width: 140px;
+        height: 168px;
+      }
+    }
+
+    /* ============================================================
+       LOADING SPINNER
+       ============================================================ */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a class="nav-logo" onclick="navigate('/')">
+        <!-- Custom SVG fingerprint logo -->
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="10" fill="rgba(56,189,248,0.12)"/>
+          <g stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" fill="none">
+            <path d="M20 8c-6.6 0-12 5.4-12 12 0 3.3 1.3 6.3 3.5 8.5"/>
+            <path d="M20 11c-5 0-9 4-9 9 0 2.5 1 4.7 2.6 6.4"/>
+            <path d="M20 14c-3.3 0-6 2.7-6 6 0 1.7.7 3.2 1.8 4.2"/>
+            <path d="M20 17c-1.7 0-3 1.3-3 3 0 .8.3 1.6.9 2.1"/>
+            <path d="M20 8c6.6 0 12 5.4 12 12"/>
+            <path d="M20 11c5 0 9 4 9 9"/>
+            <path d="M20 14c3.3 0 6 2.7 6 6"/>
+            <path d="M20 17c1.7 0 3 1.3 3 3"/>
+            <line x1="20" y1="20" x2="20" y2="32" stroke-dasharray="2 3"/>
+          </g>
+        </svg>
+        <span class="nav-logo-text">RidgeDx</span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <!-- Populated by JS based on auth state -->
+      </ul>
+
+      <div class="hamburger" id="hamburger" onclick="toggleMobileNav()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile nav -->
+  <div class="mobile-nav" id="mobileNav">
+    <!-- Populated by JS -->
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ===== PAGE: LANDING ===== -->
+  <div class="page" id="page-landing">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="dot"></span>
+          ResNet-18 Powered
+        </div>
+        <h1>
+          Predict blood type from<br>a fingerprint — <span class="gradient-text">in seconds.</span>
+        </h1>
+        <p class="hero-subtitle">
+          RidgeDx uses deep learning with Grad-CAM explainability to classify
+          all 8 ABO+Rh blood groups from a single fingerprint scan.
+        </p>
+        <div class="hero-buttons">
+          <a class="btn btn-primary btn-shimmer" onclick="navigate('/predict')" id="hero-cta-scan">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/></svg>
+            Scan Fingerprint
+          </a>
+          <a class="btn btn-secondary" onclick="showDemo()" id="hero-cta-demo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            View Demo
+          </a>
+        </div>
+
+        <!-- Fingerprint scan visual -->
+        <div class="fingerprint-visual fade-in">
+          <svg class="fingerprint-icon" viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#38bdf8" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5">
+              <path d="M100 20C55 20 20 55 20 100c0 25 10 48 27 65"/>
+              <path d="M100 35C62 35 35 62 35 100c0 20 8 38 21 52"/>
+              <path d="M100 50C70 50 50 70 50 100c0 15 6 29 16 39"/>
+              <path d="M100 65C77 65 60 82 60 100c0 10 4 19 10 26"/>
+              <path d="M100 80C85 80 75 90 75 100c0 6 2 11 6 14"/>
+              <path d="M100 20c45 0 80 35 80 80 0 25-10 48-27 65"/>
+              <path d="M100 35c38 0 65 27 65 65 0 20-8 38-21 52"/>
+              <path d="M100 50c30 0 50 20 50 50 0 15-6 29-16 39"/>
+              <path d="M100 65c23 0 40 17 40 35 0 10-4 19-10 26"/>
+              <path d="M100 80c15 0 25 10 25 20 0 6-2 11-6 14"/>
+              <line x1="100" y1="100" x2="100" y2="220" stroke-dasharray="4 6" opacity="0.3"/>
+            </g>
+          </svg>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="section" style="padding-top: 0;">
+      <div class="container">
+        <div class="stats-bar fade-in">
+          <div class="stat-item">
+            <div class="stat-value">&lt;50ms</div>
+            <div class="stat-label">Inference Speed</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">8</div>
+            <div class="stat-label">Blood Groups</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">ResNet-18</div>
+            <div class="stat-label">Architecture</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">Grad-CAM</div>
+            <div class="stat-label">Explainability</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features" id="features">
+      <div class="container">
+        <div style="text-align: center;" class="fade-in">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Core Capabilities
+          </span>
+          <h2 class="section-title">Why RidgeDx?</h2>
+          <p class="section-subtitle" style="margin: 0 auto;">Advanced biometric AI that doesn't just predict — it explains.</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/><circle cx="12" cy="15" r="2"/></svg>
+            </div>
+            <h3>AI-Powered Classification</h3>
+            <p>ResNet-18 deep learning model trained on thousands of fingerprint images. Modified for single-channel grayscale input with 8-class output.</p>
+            <span class="feature-tag">Deep Learning</span>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9h4"/></svg>
+            </div>
+            <h3>Grad-CAM Explainability</h3>
+            <p>See exactly which fingerprint regions drive the prediction. Visual heatmap overlays powered by gradient-weighted class activation mapping.</p>
+            <span class="feature-tag">Interpretable AI</span>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M12 12v6"/></svg>
+            </div>
+            <h3>8 Blood Groups</h3>
+            <p>Full ABO+Rh classification: A+, A−, B+, B−, AB+, AB−, O+, O−. Confidence scores and probability distributions for every prediction.</p>
+            <span class="feature-tag">Complete Coverage</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how-it-works" id="how-it-works">
+      <div class="container">
+        <div style="text-align: center;" class="fade-in">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Simple Process
+          </span>
+          <h2 class="section-title">How It Works</h2>
+          <p class="section-subtitle" style="margin: 0 auto;">Three steps from fingerprint to blood group prediction.</p>
+        </div>
+        <div class="steps-grid">
+          <div class="step-card fade-in">
+            <div class="step-number">1</div>
+            <h3>Upload Fingerprint</h3>
+            <p>Drag and drop or click to upload a fingerprint image. Supports JPG, PNG, and BMP formats.</p>
+          </div>
+          <div class="step-card fade-in">
+            <div class="step-number">2</div>
+            <h3>AI Analysis</h3>
+            <p>Our ResNet-18 model analyzes ridge patterns, minutiae points, and structural features in under 50ms.</p>
+          </div>
+          <div class="step-card fade-in">
+            <div class="step-number">3</div>
+            <h3>Get Results</h3>
+            <p>Receive your predicted blood group with confidence scores, probability distribution, and Grad-CAM heatmap.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <p>&copy; 2024 RidgeDx. Built by <a href="#">Adish</a>. Powered by PyTorch &amp; Flask.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===== PAGE: LOGIN ===== -->
+  <div class="page" id="page-login">
+    <div class="auth-page">
+      <div class="auth-card fade-in">
+        <div class="auth-header">
+          <h2>Welcome back</h2>
+          <p>Sign in to your RidgeDx account</p>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="login-email">Email address</label>
+            <div class="input-wrapper">
+              <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <div class="input-wrapper">
+              <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="toggle-password" onclick="togglePassword('login-password', this)" aria-label="Toggle password visibility">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="form-submit" id="login-submit">Sign In</button>
+        </form>
+
+        <div class="divider">or continue with</div>
+
+        <button class="google-btn" onclick="showToast('Google OAuth coming soon', 'info')">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
+
+        <div class="auth-footer">
+          Don't have an account? <a onclick="navigate('/signup')">Sign up</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: SIGNUP ===== -->
+  <div class="page" id="page-signup">
+    <div class="auth-page">
+      <div class="auth-card fade-in">
+        <div class="auth-header">
+          <h2>Create account</h2>
+          <p>Get started with RidgeDx</p>
+        </div>
+
+        <form id="signupForm" onsubmit="handleSignup(event)">
+          <div class="form-group">
+            <label for="signup-name">Full name</label>
+            <div class="input-wrapper">
+              <input type="text" id="signup-name" placeholder="John Doe" required autocomplete="name">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="signup-email">Email address</label>
+            <div class="input-wrapper">
+              <input type="email" id="signup-email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="signup-password">Password</label>
+            <div class="input-wrapper">
+              <input type="password" id="signup-password" placeholder="Create a password" required autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+              <button type="button" class="toggle-password" onclick="togglePassword('signup-password', this)" aria-label="Toggle password visibility">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="strength-meter" id="strengthMeter">
+              <div class="bar"></div>
+              <div class="bar"></div>
+              <div class="bar"></div>
+              <div class="bar"></div>
+            </div>
+            <div class="strength-label" id="strengthLabel"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="signup-confirm">Confirm password</label>
+            <div class="input-wrapper">
+              <input type="password" id="signup-confirm" placeholder="Confirm your password" required autocomplete="new-password">
+              <button type="button" class="toggle-password" onclick="togglePassword('signup-confirm', this)" aria-label="Toggle password visibility">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="form-submit" id="signup-submit">Create Account</button>
+        </form>
+
+        <div class="divider">or continue with</div>
+
+        <button class="google-btn" onclick="showToast('Google OAuth coming soon', 'info')">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
+
+        <div class="auth-footer">
+          Already have an account? <a onclick="navigate('/login')">Sign in</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: PREDICT ===== -->
+  <div class="page" id="page-predict">
+    <div class="predict-page">
+      <div class="container">
+        <div style="margin-bottom: 32px;" class="fade-in">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/></svg>
+            Analysis
+          </span>
+          <h2 class="section-title">Analyze Fingerprint</h2>
+          <p class="section-subtitle">Upload a fingerprint image to predict the blood group.</p>
+        </div>
+
+        <div class="predict-layout">
+          <!-- Upload zone -->
+          <div class="upload-zone fade-in" id="uploadZone"
+               onclick="document.getElementById('fileInput').click()"
+               ondragover="handleDragOver(event)"
+               ondragleave="handleDragLeave(event)"
+               ondrop="handleDrop(event)">
+            <svg class="upload-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#38bdf8" stroke-width="2" stroke-linecap="round" fill="none">
+                <path d="M32 8C18 8 8 18 8 32c0 7 3 13.5 7.5 18"/>
+                <path d="M32 14C21 14 14 21 14 32c0 5.5 2 10.5 5.5 14"/>
+                <path d="M32 20C24 20 20 24 20 32c0 4 1.5 7.5 4 10"/>
+                <path d="M32 26C27 26 26 29 26 32c0 2.5 1 4.5 2.5 6"/>
+                <path d="M32 8c14 0 24 10 24 24 0 7-3 13.5-7.5 18"/>
+                <path d="M32 14c11 0 18 7 18 18 0 5.5-2 10.5-5.5 14"/>
+                <path d="M32 20c8 0 12 4 12 12 0 4-1.5 7.5-4 10"/>
+                <path d="M32 26c5 0 6 3 6 6 0 2.5-1 4.5-2.5 6"/>
+                <line x1="32" y1="32" x2="32" y2="56" stroke-dasharray="3 4" opacity="0.4"/>
+              </g>
+            </svg>
+            <h3>Drop your fingerprint image here</h3>
+            <p>or click to browse files</p>
+            <span class="file-types">Supports JPG, PNG, BMP • Max 16MB</span>
+            <input type="file" id="fileInput" class="upload-input" accept="image/*" onchange="handleFileSelect(this)">
+          </div>
+
+          <!-- Preview panel -->
+          <div class="preview-panel fade-in">
+            <h3>Preview</h3>
+            <div class="preview-image-container" id="previewContainer">
+              <div class="preview-placeholder" id="previewPlaceholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" style="margin: 0 auto 8px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <br>No image selected
+              </div>
+              <img id="previewImage" src="" alt="Fingerprint preview" style="display:none;">
+              <!-- Scanning overlay -->
+              <div class="scanning-overlay" id="scanningOverlay">
+                <svg class="scanning-fingerprint" viewBox="0 0 80 80" fill="none">
+                  <g stroke="#38bdf8" stroke-width="2" stroke-linecap="round" fill="none">
+                    <path d="M40 10C23 10 10 23 10 40c0 10 4 18 10 24"/>
+                    <path d="M40 18C27 18 18 27 18 40c0 7 3 14 8 18"/>
+                    <path d="M40 26C31 26 26 31 26 40c0 5 2 9 5 12"/>
+                    <path d="M40 34C36 34 34 36 34 40c0 2 1 4 3 6"/>
+                    <path d="M40 10c17 0 30 13 30 30 0 10-4 18-10 24"/>
+                    <path d="M40 18c13 0 22 9 22 22 0 7-3 14-8 18"/>
+                    <path d="M40 26c9 0 14 5 14 14 0 5-2 9-5 12"/>
+                    <path d="M40 34c4 0 6 2 6 6 0 2-1 4-3 6"/>
+                  </g>
+                </svg>
+                <div class="scanning-text">Analyzing ridge patterns<span class="scanning-dots"></span></div>
+              </div>
+            </div>
+
+            <div id="fileInfo" style="text-align:center; margin-bottom: 16px; font-size: 0.85rem; color: var(--text-muted); display:none;"></div>
+
+            <button class="btn btn-primary btn-shimmer analyze-btn" id="analyzeBtn" onclick="runPrediction()" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/></svg>
+              Analyze Fingerprint
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: RESULT ===== -->
+  <div class="page" id="page-result">
+    <div class="result-page">
+      <div class="container">
+        <div class="result-layout">
+          <!-- Hero result -->
+          <div class="result-hero fade-in">
+            <div class="blood-badge" id="resultBadge">A+</div>
+            <h2>Predicted Blood Group</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">Based on fingerprint ridge pattern analysis</p>
+            <div class="inference-badge" id="inferenceBadge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              <span id="inferenceTime">42ms inference</span>
+            </div>
+          </div>
+
+          <!-- Confidence + Probabilities -->
+          <div class="confidence-section fade-in">
+            <div class="radial-progress" id="radialProgress">
+              <svg viewBox="0 0 180 180">
+                <circle class="bg-ring" cx="90" cy="90" r="80"/>
+                <circle class="progress-ring" id="progressRing" cx="90" cy="90" r="80"
+                        stroke-dasharray="502.65"
+                        stroke-dashoffset="502.65"/>
+              </svg>
+              <div class="center-text">
+                <span class="percentage" id="confidenceValue">0%</span>
+                <span class="conf-label">Confidence</span>
+              </div>
+            </div>
+
+            <div class="prob-bars" id="probBars">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Grad-CAM -->
+          <div class="gradcam-section fade-in">
+            <h3>Grad-CAM Activation Map</h3>
+            <p class="description">Highlighted regions show which parts of the fingerprint most influenced the prediction.</p>
+            <div class="gradcam-placeholder" id="gradcamContainer">
+              <div class="gradcam-placeholder-text" id="gradcamPlaceholder">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" style="margin: 0 auto 8px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <br>Grad-CAM heatmap will appear here after analysis<br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Requires backend connection</span>
+              </div>
+              <img id="gradcamImage" src="" alt="Grad-CAM heatmap" style="display:none; width:100%; height:100%; object-fit:cover; border-radius: var(--radius-input);">
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 16px; justify-content: center; margin-top: 40px; flex-wrap: wrap;" class="fade-in">
+            <a class="btn btn-primary" onclick="navigate('/predict')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/></svg>
+              Scan Another
+            </a>
+            <a class="btn btn-secondary" onclick="navigate('/dashboard')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              View Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: DASHBOARD ===== -->
+  <div class="page" id="page-dashboard">
+    <div class="dashboard-page">
+      <div class="container">
+        <div class="dashboard-header fade-in">
+          <h1>Dashboard</h1>
+          <p>Overview of your biometric analysis activity</p>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stats-cards fade-in">
+          <div class="stat-card">
+            <div class="stat-card-label">Total Scans</div>
+            <div class="stat-card-value" id="dashTotalScans">0</div>
+            <div class="stat-card-change">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m-7 7l7-7 7 7"/></svg>
+              This session
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Last Result</div>
+            <div class="stat-card-value" id="dashLastResult">—</div>
+            <div class="stat-card-change" id="dashLastConf">No scans yet</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Model</div>
+            <div class="stat-card-value" style="font-size: 1.25rem;">ResNet-18</div>
+            <div class="stat-card-change">8-class ABO+Rh</div>
+          </div>
+        </div>
+
+        <!-- Scan history -->
+        <div class="history-section fade-in">
+          <div class="history-header">
+            <h3>Recent Scans</h3>
+            <a class="btn btn-primary" onclick="navigate('/predict')" style="padding: 8px 16px; font-size: 0.8rem;">
+              + New Scan
+            </a>
+          </div>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Blood Group</th>
+                <th>Confidence</th>
+                <th>Inference</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                  No scans yet. <a onclick="navigate('/predict')" style="cursor:pointer;">Run your first analysis →</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    /* ==============================================================
+       STATE
+       ============================================================== */
+    const STORAGE_KEY = 'ridgedx_user';
+    const SCANS_KEY = 'ridgedx_scans';
+    const BLOOD_GROUPS = ['A+', 'A-', 'AB+', 'AB-', 'B+', 'B-', 'O+', 'O-'];
+
+    let currentFile = null;
+    let currentFileDataUrl = null;
+    let lastResult = null;
+
+    /* ==============================================================
+       ROUTER
+       ============================================================== */
+    function navigate(path) {
+      window.location.hash = path;
+    }
+
+    function getRoute() {
+      const hash = window.location.hash.replace('#', '') || '/';
+      return hash;
+    }
+
+    function routeToPageId(route) {
+      const map = {
+        '/': 'page-landing',
+        '/login': 'page-login',
+        '/signup': 'page-signup',
+        '/predict': 'page-predict',
+        '/result': 'page-result',
+        '/dashboard': 'page-dashboard'
+      };
+      return map[route] || 'page-landing';
+    }
+
+    function handleRoute() {
+      const route = getRoute();
+      const pageId = routeToPageId(route);
+      const isLoggedIn = !!getUser();
+
+      // Auth guard for protected routes
+      if ((route === '/predict' || route === '/result' || route === '/dashboard') && !isLoggedIn) {
+        showToast('Please sign in to access this feature', 'error');
+        navigate('/login');
+        return;
+      }
+
+      // Redirect logged-in users from auth pages
+      if ((route === '/login' || route === '/signup') && isLoggedIn) {
+        navigate('/dashboard');
+        return;
+      }
+
+      // Hide all pages
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+      // Show target page
+      const target = document.getElementById(pageId);
+      if (target) {
+        target.classList.add('active');
+        // Trigger fade-in animations
+        setTimeout(() => {
+          target.querySelectorAll('.fade-in').forEach(el => el.classList.add('visible'));
+        }, 50);
+      }
+
+      // Update nav
+      updateNav();
+      closeMobileNav();
+
+      // Scroll to top
+      window.scrollTo(0, 0);
+    }
+
+    window.addEventListener('hashchange', handleRoute);
+
+    /* ==============================================================
+       NAVIGATION
+       ============================================================== */
+    function updateNav() {
+      const isLoggedIn = !!getUser();
+      const route = getRoute();
+      const navLinks = document.getElementById('navLinks');
+      const mobileNav = document.getElementById('mobileNav');
+
+      let links = '';
+      if (isLoggedIn) {
+        links = `
+          <li><a onclick="navigate('/dashboard')" class="${route === '/dashboard' ? 'active' : ''}">Dashboard</a></li>
+          <li><a onclick="navigate('/predict')" class="${route === '/predict' ? 'active' : ''}">Predict</a></li>
+          <li><a onclick="navigate('/')" class="${route === '/' ? 'active' : ''}">About</a></li>
+          <li><a onclick="handleLogout()" class="nav-cta" style="background: var(--danger) !important;">Logout</a></li>
+        `;
+      } else {
+        links = `
+          <li><a onclick="navigate('/')" class="${route === '/' ? 'active' : ''}">Home</a></li>
+          <li><a onclick="navigate('/')" class="${route.includes('about') ? 'active' : ''}">About</a></li>
+          <li><a onclick="navigate('/login')" class="${route === '/login' ? 'active' : ''}">Login</a></li>
+          <li><a onclick="navigate('/signup')" class="nav-cta">Sign Up</a></li>
+        `;
+      }
+
+      navLinks.innerHTML = links;
+
+      // Mobile nav - same links but different structure
+      let mobileLinks = '';
+      if (isLoggedIn) {
+        mobileLinks = `
+          <a onclick="navigate('/dashboard')" class="${route === '/dashboard' ? 'active' : ''}">Dashboard</a>
+          <a onclick="navigate('/predict')" class="${route === '/predict' ? 'active' : ''}">Predict</a>
+          <a onclick="navigate('/')" class="${route === '/' ? 'active' : ''}">About</a>
+          <a onclick="handleLogout()">Logout</a>
+        `;
+      } else {
+        mobileLinks = `
+          <a onclick="navigate('/')" class="${route === '/' ? 'active' : ''}">Home</a>
+          <a onclick="navigate('/')" class="${route.includes('about') ? 'active' : ''}">About</a>
+          <a onclick="navigate('/login')" class="${route === '/login' ? 'active' : ''}">Login</a>
+          <a onclick="navigate('/signup')">Sign Up</a>
+        `;
+      }
+      mobileNav.innerHTML = mobileLinks;
+    }
+
+    function toggleMobileNav() {
+      const hamburger = document.getElementById('hamburger');
+      const mobileNav = document.getElementById('mobileNav');
+      hamburger.classList.toggle('open');
+      mobileNav.classList.toggle('open');
+    }
+
+    function closeMobileNav() {
+      document.getElementById('hamburger').classList.remove('open');
+      document.getElementById('mobileNav').classList.remove('open');
+    }
+
+    /* ==============================================================
+       AUTH
+       ============================================================== */
+    function getUser() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function setUser(user) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    }
+
+    function removeUser() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      if (!email || !password) {
+        showToast('Please fill in all fields', 'error');
+        return;
+      }
+
+      // Simulate login
+      const btn = document.getElementById('login-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      setTimeout(() => {
+        setUser({
+          name: email.split('@')[0],
+          email: email,
+          joinedAt: new Date().toISOString()
+        });
+
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        showToast('Welcome back! Signed in successfully.', 'success');
+        navigate('/dashboard');
+      }, 1000);
+    }
+
+    function handleSignup(e) {
+      e.preventDefault();
+      const name = document.getElementById('signup-name').value;
+      const email = document.getElementById('signup-email').value;
+      const password = document.getElementById('signup-password').value;
+      const confirm = document.getElementById('signup-confirm').value;
+
+      if (!name || !email || !password || !confirm) {
+        showToast('Please fill in all fields', 'error');
+        return;
+      }
+
+      if (password !== confirm) {
+        showToast('Passwords do not match', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('signup-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      setTimeout(() => {
+        setUser({
+          name: name,
+          email: email,
+          joinedAt: new Date().toISOString()
+        });
+
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        showToast('Account created successfully!', 'success');
+        navigate('/dashboard');
+      }, 1200);
+    }
+
+    function handleLogout() {
+      removeUser();
+      showToast('Signed out successfully', 'success');
+      navigate('/');
+    }
+
+    /* ==============================================================
+       PASSWORD UTILITIES
+       ============================================================== */
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = isPassword
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+
+    function checkPasswordStrength(password) {
+      const meter = document.getElementById('strengthMeter');
+      const label = document.getElementById('strengthLabel');
+
+      let score = 0;
+      if (password.length >= 6) score++;
+      if (password.length >= 10) score++;
+      if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+      if (/\d/.test(password)) score++;
+      if (/[^A-Za-z0-9]/.test(password)) score++;
+
+      meter.className = 'strength-meter';
+      if (password.length === 0) {
+        label.textContent = '';
+        return;
+      }
+
+      if (score <= 1) {
+        meter.classList.add('weak');
+        label.textContent = 'Weak password';
+        label.style.color = 'var(--danger)';
+      } else if (score <= 2) {
+        meter.classList.add('medium');
+        label.textContent = 'Fair password';
+        label.style.color = 'var(--warning)';
+      } else if (score <= 3) {
+        meter.classList.add('strong');
+        label.textContent = 'Strong password';
+        label.style.color = 'var(--success)';
+      } else {
+        meter.classList.add('very-strong');
+        label.textContent = 'Very strong password';
+        label.style.color = 'var(--success)';
+      }
+    }
+
+    /* ==============================================================
+       FILE UPLOAD & DRAG-DROP
+       ============================================================== */
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadZone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadZone').classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadZone').classList.remove('drag-over');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    }
+
+    function handleFileSelect(input) {
+      if (input.files && input.files[0]) {
+        processFile(input.files[0]);
+      }
+    }
+
+    function processFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file', 'error');
+        return;
+      }
+
+      if (file.size > 16 * 1024 * 1024) {
+        showToast('File size must be under 16MB', 'error');
+        return;
+      }
+
+      currentFile = file;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        currentFileDataUrl = e.target.result;
+        const preview = document.getElementById('previewImage');
+        const placeholder = document.getElementById('previewPlaceholder');
+        const uploadZone = document.getElementById('uploadZone');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const fileInfo = document.getElementById('fileInfo');
+
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+        uploadZone.classList.add('has-file');
+        analyzeBtn.disabled = false;
+        fileInfo.style.display = 'block';
+        fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* ==============================================================
+       PREDICTION (Mock + Real API)
+       ============================================================== */
+    function runPrediction() {
+      if (!currentFile) {
+        showToast('Please select a fingerprint image first', 'error');
+        return;
+      }
+
+      const overlay = document.getElementById('scanningOverlay');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+
+      overlay.classList.add('active');
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+
+      // Try real API first, fall back to mock
+      tryRealApi().catch(() => mockPredict());
+    }
+
+    async function tryRealApi() {
+      const formData = new FormData();
+      formData.append('file', currentFile);
+
+      const response = await fetch('/api/v1/predict', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('API not available');
+
+      const data = await response.json();
+      displayResult({
+        bloodGroup: data.prediction,
+        confidence: data.confidence,
+        probabilities: data.all_probabilities,
+        inferenceMs: data.inference_time_ms,
+        gradcamBase64: data.grad_cam_base64
+      });
+    }
+
+    function mockPredict() {
+      setTimeout(() => {
+        const randomIdx = Math.floor(Math.random() * BLOOD_GROUPS.length);
+        const topGroup = BLOOD_GROUPS[randomIdx];
+        const confidence = (78 + Math.random() * 18).toFixed(1);
+        const inferenceMs = (32 + Math.random() * 16).toFixed(0);
+
+        // Generate mock probabilities
+        const probs = {};
+        let remaining = 100;
+        BLOOD_GROUPS.forEach((bg, i) => {
+          if (bg === topGroup) {
+            probs[bg] = parseFloat(confidence);
+            remaining -= probs[bg];
+          } else {
+            const val = i === BLOOD_GROUPS.length - 1
+              ? Math.max(0, remaining)
+              : Math.max(0.1, Math.min(remaining * 0.3, Math.random() * remaining * 0.5));
+            probs[bg] = parseFloat(val.toFixed(1));
+            remaining -= probs[bg];
+          }
+        });
+
+        displayResult({
+          bloodGroup: topGroup,
+          confidence: parseFloat(confidence),
+          probabilities: probs,
+          inferenceMs: parseFloat(inferenceMs),
+          gradcamBase64: null
+        });
+      }, 2500);
+    }
+
+    function displayResult(result) {
+      lastResult = result;
+
+      // Save to scan history
+      saveScan(result);
+
+      // Reset predict page
+      document.getElementById('scanningOverlay').classList.remove('active');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/></svg>
+        Analyze Fingerprint
+      `;
+
+      // Navigate to result page
+      navigate('/result');
+
+      // Populate result page after a brief delay for page transition
+      setTimeout(() => {
+        // Blood badge
+        document.getElementById('resultBadge').textContent = result.bloodGroup;
+
+        // Inference badge
+        document.getElementById('inferenceTime').textContent = `${result.inferenceMs}ms inference`;
+
+        // Confidence ring animation
+        const circumference = 2 * Math.PI * 80; // radius = 80
+        const offset = circumference - (result.confidence / 100) * circumference;
+        const ring = document.getElementById('progressRing');
+        ring.style.strokeDasharray = circumference;
+        ring.style.strokeDashoffset = circumference;
+        setTimeout(() => {
+          ring.style.strokeDashoffset = offset;
+        }, 100);
+
+        // Confidence number
+        animateValue('confidenceValue', 0, result.confidence, 1500);
+
+        // Probability bars
+        const probBars = document.getElementById('probBars');
+        probBars.innerHTML = '';
+        const sortedGroups = [...BLOOD_GROUPS].sort((a, b) =>
+          (result.probabilities[b] || 0) - (result.probabilities[a] || 0)
+        );
+
+        sortedGroups.forEach((bg, i) => {
+          const val = result.probabilities[bg] || 0;
+          const isTop = bg === result.bloodGroup;
+          const row = document.createElement('div');
+          row.className = 'prob-row';
+          row.innerHTML = `
+            <span class="prob-label ${isTop ? 'highlight' : ''}">${bg}</span>
+            <div class="prob-track">
+              <div class="prob-fill ${isTop ? 'top' : ''}" style="width: 0%"></div>
+            </div>
+            <span class="prob-value">${val.toFixed(1)}%</span>
+          `;
+          probBars.appendChild(row);
+
+          // Animate bar
+          setTimeout(() => {
+            row.querySelector('.prob-fill').style.width = `${val}%`;
+          }, 200 + i * 100);
+        });
+
+        // Grad-CAM
+        if (result.gradcamBase64) {
+          document.getElementById('gradcamPlaceholder').style.display = 'none';
+          const gcImg = document.getElementById('gradcamImage');
+          gcImg.src = `data:image/png;base64,${result.gradcamBase64}`;
+          gcImg.style.display = 'block';
+        } else {
+          document.getElementById('gradcamPlaceholder').style.display = 'flex';
+          document.getElementById('gradcamImage').style.display = 'none';
+        }
+      }, 150);
+    }
+
+    function animateValue(elementId, start, end, duration) {
+      const el = document.getElementById(elementId);
+      const range = end - start;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const current = start + range * eased;
+        el.textContent = `${current.toFixed(1)}%`;
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    /* ==============================================================
+       SCAN HISTORY
+       ============================================================== */
+    function getScans() {
+      try {
+        const data = localStorage.getItem(SCANS_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveScan(result) {
+      const scans = getScans();
+      scans.unshift({
+        date: new Date().toISOString(),
+        bloodGroup: result.bloodGroup,
+        confidence: result.confidence,
+        inferenceMs: result.inferenceMs
+      });
+      // Keep last 50 scans
+      if (scans.length > 50) scans.length = 50;
+      localStorage.setItem(SCANS_KEY, JSON.stringify(scans));
+    }
+
+    function updateDashboard() {
+      const scans = getScans();
+
+      // Stats
+      document.getElementById('dashTotalScans').textContent = scans.length;
+
+      if (scans.length > 0) {
+        const latest = scans[0];
+        document.getElementById('dashLastResult').textContent = latest.bloodGroup;
+        document.getElementById('dashLastConf').textContent = `${latest.confidence.toFixed(1)}% confidence`;
+      }
+
+      // Table
+      const tbody = document.getElementById('historyBody');
+      if (scans.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              No scans yet. <a onclick="navigate('/predict')" style="cursor:pointer;">Run your first analysis →</a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = scans.slice(0, 10).map(scan => {
+        const date = new Date(scan.date);
+        const dateStr = date.toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric'
+        });
+        const timeStr = date.toLocaleTimeString('en-US', {
+          hour: '2-digit', minute: '2-digit'
+        });
+
+        return `
+          <tr>
+            <td>${dateStr} ${timeStr}</td>
+            <td><span class="table-badge blood">${scan.bloodGroup}</span></td>
+            <td><span class="table-badge confidence">${scan.confidence.toFixed(1)}%</span></td>
+            <td>${scan.inferenceMs}ms</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* ==============================================================
+       DEMO
+       ============================================================== */
+    function showDemo() {
+      // Simulate a login and prediction flow
+      if (!getUser()) {
+        setUser({
+          name: 'Demo User',
+          email: 'demo@ridgedx.ai',
+          joinedAt: new Date().toISOString()
+        });
+        showToast('Demo mode activated — signed in as Demo User', 'success');
+      }
+
+      // Run a mock prediction
+      const randomIdx = Math.floor(Math.random() * BLOOD_GROUPS.length);
+      const topGroup = BLOOD_GROUPS[randomIdx];
+      const confidence = (82 + Math.random() * 14).toFixed(1);
+
+      const probs = {};
+      let remaining = 100;
+      BLOOD_GROUPS.forEach((bg, i) => {
+        if (bg === topGroup) {
+          probs[bg] = parseFloat(confidence);
+          remaining -= probs[bg];
+        } else {
+          const val = i === BLOOD_GROUPS.length - 1
+            ? Math.max(0, remaining)
+            : Math.max(0.5, Math.random() * remaining * 0.4);
+          probs[bg] = parseFloat(val.toFixed(1));
+          remaining -= probs[bg];
+        }
+      });
+
+      displayResult({
+        bloodGroup: topGroup,
+        confidence: parseFloat(confidence),
+        probabilities: probs,
+        inferenceMs: parseFloat((35 + Math.random() * 13).toFixed(0)),
+        gradcamBase64: null
+      });
+    }
+
+    /* ==============================================================
+       TOASTS
+       ============================================================== */
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    /* ==============================================================
+       INTERSECTION OBSERVER (scroll animations)
+       ============================================================== */
+    function initScrollAnimations() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+      });
+
+      document.querySelectorAll('.fade-in').forEach(el => {
+        observer.observe(el);
+      });
+    }
+
+    /* ==============================================================
+       INITIALIZATION
+       ============================================================== */
+    document.addEventListener('DOMContentLoaded', () => {
+      handleRoute();
+      initScrollAnimations();
+
+      // Update dashboard whenever it becomes visible
+      const dashObserver = new MutationObserver(() => {
+        if (document.getElementById('page-dashboard').classList.contains('active')) {
+          updateDashboard();
+        }
+      });
+
+      dashObserver.observe(document.getElementById('page-dashboard'), {
+        attributes: true,
+        attributeFilter: ['class']
+      });
+    });
+
+    // Handle direct URL access
+    if (!window.location.hash) {
+      window.location.hash = '/';
+    }
+  </script>
+</body>
+</html>

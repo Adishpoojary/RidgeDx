@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: ridgedx-api
+    env_file:
+      - .env
+    volumes:
+      - ./Code/static/uploads:/app/static/uploads
+      - ./Code/users.db:/app/users.db
+      - model-data:/app/models
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    networks:
+      - ridgedx-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: ridgedx-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./Code/static:/usr/share/nginx/html/static:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - ridgedx-net
+
+volumes:
+  model-data:
+
+networks:
+  ridgedx-net:
+    driver: bridge
