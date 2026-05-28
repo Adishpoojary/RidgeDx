@@ -2464,8 +2464,10 @@
     }
 
     /* ==============================================================
-       PREDICTION (Mock + Real API)
+       PREDICTION — Real API only (no silent mock fallback)
        ============================================================== */
+    let predictionAttempt = 0;
+
     function runPrediction() {
       if (!currentFile) {
         showToast('Please select a fingerprint image first', 'error');
@@ -2478,63 +2480,115 @@
       overlay.classList.add('active');
       analyzeBtn.disabled = true;
       analyzeBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+      predictionAttempt = 0;
 
-      // Try real API first, fall back to mock
-      tryRealApi().catch(() => mockPredict());
+      callPredictApi();
     }
 
-    async function tryRealApi() {
-      const formData = new FormData();
-      formData.append('file', currentFile);
+    async function callPredictApi() {
+      predictionAttempt++;
+      const scanText = document.querySelector('.scanning-text');
 
-      const response = await fetch('/api/v1/predict', {
-        method: 'POST',
-        body: formData
-      });
+      try {
+        const formData = new FormData();
+        formData.append('file', currentFile);
 
-      if (!response.ok) throw new Error('API not available');
+        // Use AbortController for timeout (120s for Render cold starts)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-      const data = await response.json();
-      displayResult({
-        bloodGroup: data.prediction,
-        confidence: data.confidence,
-        probabilities: data.all_probabilities,
-        inferenceMs: data.inference_time_ms,
-        gradcamBase64: data.grad_cam_base64
-      });
-    }
+        if (predictionAttempt === 1) {
+          scanText.innerHTML = 'Analyzing ridge patterns<span class="scanning-dots"></span>';
+        } else {
+          scanText.innerHTML = 'Server waking up, retrying<span class="scanning-dots"></span>';
+        }
 
-    function mockPredict() {
-      setTimeout(() => {
-        const randomIdx = Math.floor(Math.random() * BLOOD_GROUPS.length);
-        const topGroup = BLOOD_GROUPS[randomIdx];
-        const confidence = (78 + Math.random() * 18).toFixed(1);
-        const inferenceMs = (32 + Math.random() * 16).toFixed(0);
-
-        // Generate mock probabilities
-        const probs = {};
-        let remaining = 100;
-        BLOOD_GROUPS.forEach((bg, i) => {
-          if (bg === topGroup) {
-            probs[bg] = parseFloat(confidence);
-            remaining -= probs[bg];
-          } else {
-            const val = i === BLOOD_GROUPS.length - 1
-              ? Math.max(0, remaining)
-              : Math.max(0.1, Math.min(remaining * 0.3, Math.random() * remaining * 0.5));
-            probs[bg] = parseFloat(val.toFixed(1));
-            remaining -= probs[bg];
-          }
+        const response = await fetch('/api/v1/predict', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Server error (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
         displayResult({
-          bloodGroup: topGroup,
-          confidence: parseFloat(confidence),
-          probabilities: probs,
-          inferenceMs: parseFloat(inferenceMs),
-          gradcamBase64: null
+          bloodGroup: data.prediction,
+          confidence: data.confidence,
+          probabilities: data.all_probabilities,
+          inferenceMs: data.inference_time_ms,
+          gradcamBase64: data.grad_cam_base64
         });
-      }, 2500);
+
+      } catch (err) {
+        // Retry once for cold-start timeouts
+        if (predictionAttempt < 2 && (err.name === 'AbortError' || err.message.includes('Failed to fetch'))) {
+          showToast('Server is waking up (free tier). Retrying...', 'info');
+          callPredictApi();
+          return;
+        }
+
+        // Show actual error — do NOT fall back to random mock
+        resetPredictUI();
+        if (err.name === 'AbortError') {
+          showToast('Request timed out. The server may be sleeping — try again in 30 seconds.', 'error');
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          showToast('Cannot reach server. Check your connection or try again later.', 'error');
+        } else {
+          showToast(`Prediction failed: ${err.message}`, 'error');
+        }
+      }
+    }
+
+    function resetPredictUI() {
+      document.getElementById('scanningOverlay').classList.remove('active');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3H5a2 2 0 0 0-2 2v2m0 10v2a2 2 0 0 0 2 2h2m10-18h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/></svg>
+        Analyze Fingerprint
+      `;
+    }
+
+    /* Mock prediction — ONLY used by the "View Demo" button on the landing page */
+    function mockPredict() {
+      const randomIdx = Math.floor(Math.random() * BLOOD_GROUPS.length);
+      const topGroup = BLOOD_GROUPS[randomIdx];
+      const confidence = (78 + Math.random() * 18).toFixed(1);
+      const inferenceMs = (32 + Math.random() * 16).toFixed(0);
+
+      const probs = {};
+      let remaining = 100;
+      BLOOD_GROUPS.forEach((bg, i) => {
+        if (bg === topGroup) {
+          probs[bg] = parseFloat(confidence);
+          remaining -= probs[bg];
+        } else {
+          const val = i === BLOOD_GROUPS.length - 1
+            ? Math.max(0, remaining)
+            : Math.max(0.1, Math.min(remaining * 0.3, Math.random() * remaining * 0.5));
+          probs[bg] = parseFloat(val.toFixed(1));
+          remaining -= probs[bg];
+        }
+      });
+
+      displayResult({
+        bloodGroup: topGroup,
+        confidence: parseFloat(confidence),
+        probabilities: probs,
+        inferenceMs: parseFloat(inferenceMs),
+        gradcamBase64: null
+      });
     }
 
     function displayResult(result) {
