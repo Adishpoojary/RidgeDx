@@ -122,7 +122,7 @@ def softmax(x):
 
 
 # ============================================================
-# Swagger API
+# Swagger API (optional — docs at /api/docs)
 # ============================================================
 if SWAGGER_AVAILABLE:
     api = Api(
@@ -130,8 +130,7 @@ if SWAGGER_AVAILABLE:
         version='1.0',
         title='RidgeDx API',
         description='AI-powered blood group prediction from fingerprint images',
-        doc='/api/docs',
-        prefix='/api/v1'
+        doc='/api/docs'
     )
 
     predict_ns = Namespace('predict', description='Prediction operations')
@@ -151,10 +150,14 @@ if SWAGGER_AVAILABLE:
         def post(self):
             """Predict blood group from a fingerprint image."""
             return _handle_api_predict()
-else:
-    @app.route('/api/v1/predict', methods=['POST'])
-    def api_predict():
-        return jsonify(_handle_api_predict())
+
+# Always register a plain Flask route as guaranteed fallback
+@app.route('/api/v1/predict', methods=['POST'])
+def api_predict_fallback():
+    result = _handle_api_predict()
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1]
+    return jsonify(result)
 
 
 def _handle_api_predict():
