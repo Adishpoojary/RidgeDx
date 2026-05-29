@@ -130,11 +130,12 @@ if SWAGGER_AVAILABLE:
         version='1.0',
         title='RidgeDx API',
         description='AI-powered blood group prediction from fingerprint images',
-        doc='/api/docs'
+        doc='/api/docs',
+        prefix='/api/v1'
     )
 
     predict_ns = Namespace('predict', description='Prediction operations')
-    api.add_namespace(predict_ns, path='/api/v1')
+    api.add_namespace(predict_ns, path='/')
 
     prediction_model = api.model('PredictionResult', {
         'prediction': fields.String(description='Predicted blood group', example='A+'),
